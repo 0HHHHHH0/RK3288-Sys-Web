@@ -49,17 +49,64 @@ def login(req: LoginRequest):
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
 
+# Global state to calculate network and IO speeds
+last_sys_check_time = time.time()
+last_net_io = psutil.net_io_counters()
+last_disk_io = psutil.disk_io_counters()
+
 @app.get("/api/system/status", dependencies=[Depends(verify_token)])
 def get_system_status() -> Dict[str, Any]:
+    global last_sys_check_time, last_net_io, last_disk_io
+    
+    current_time = time.time()
+    time_diff = current_time - last_sys_check_time
+
     # CPU
     cpu_percent = psutil.cpu_percent(interval=None)
     # Memory
     mem = psutil.virtual_memory()
     # Disk (Root)
     disk = psutil.disk_usage('/')
-    # Network
-    net_io = psutil.net_io_counters()
     
+    # Network IP & MAC
+    ip_address = "127.0.0.1"
+    mac_address = "00:00:00:00:00:00"
+    net_if_addrs = psutil.net_if_addrs()
+    if 'eth0' in net_if_addrs:
+        for addr in net_if_addrs['eth0']:
+            if addr.family == 2: # AF_INET
+                ip_address = addr.address
+            elif addr.family == 17: # AF_PACKET
+                mac_address = addr.address
+    elif 'wlan0' in net_if_addrs:
+         for addr in net_if_addrs['wlan0']:
+            if addr.family == 2:
+                ip_address = addr.address
+            elif addr.family == 17:
+                mac_address = addr.address
+
+    # Network I/O Speed
+    current_net_io = psutil.net_io_counters()
+    upload_speed = 0
+    download_speed = 0
+    if time_diff > 0:
+        upload_speed = (current_net_io.bytes_sent - last_net_io.bytes_sent) / time_diff
+        download_speed = (current_net_io.bytes_recv - last_net_io.bytes_recv) / time_diff
+
+    # Disk I/O Speed
+    current_disk_io = psutil.disk_io_counters()
+    io_read_speed = 0
+    io_write_speed = 0
+    if time_diff > 0 and current_disk_io and last_disk_io:
+        io_read_speed = (current_disk_io.read_bytes - last_disk_io.read_bytes) / time_diff
+        io_write_speed = (current_disk_io.write_bytes - last_disk_io.write_bytes) / time_diff
+    
+    # Update globals
+    last_sys_check_time = current_time
+    last_net_io = current_net_io
+    if current_disk_io:
+        last_disk_io = current_disk_io
+
     # Get boot time
     uptime_seconds = time.time() - psutil.boot_time()
     
@@ -80,14 +127,16 @@ def get_system_status() -> Dict[str, Any]:
             "total": disk.total,
             "used": disk.used,
             "percent": disk.percent,
-            "io_read": 1024 * 50, # Mock IO read bytes/s
-            "io_write": 1024 * 20  # Mock IO write bytes/s
+            "io_read": io_read_speed,
+            "io_write": io_write_speed
         },
         "network": {
-            "bytes_sent": net_io.bytes_sent,
-            "bytes_recv": net_io.bytes_recv,
-            "upload_speed": 1024 * 120, # Mock upload speed bytes/s
-            "download_speed": 1024 * 850 # Mock download speed bytes/s
+            "ip_address": ip_address,
+            "mac_address": mac_address,
+            "bytes_sent": current_net_io.bytes_sent,
+            "bytes_recv": current_net_io.bytes_recv,
+            "upload_speed": upload_speed,
+            "download_speed": download_speed
         },
         "uptime": uptime_seconds
     }

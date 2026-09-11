@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Monitor, Wifi, Cpu, HardDrive, Shield, Info, Palette } from 'lucide-react';
+import { getSystemStatusApi } from '../api';
 
 const MENU_ITEMS = [
   { id: 'system', icon: <Cpu className="w-5 h-5" />, label: '系统信息' },
@@ -12,6 +13,20 @@ const MENU_ITEMS = [
 
 export default function SettingsApp() {
   const [activeTab, setActiveTab] = useState('system');
+  const [status, setStatus] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      const token = localStorage.getItem('feiniu_token') || '';
+      const data = await getSystemStatusApi(token);
+      setStatus(data);
+    };
+    fetchStatus();
+    
+    // Only fetch occasionally for settings since it's mostly static info
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="w-full h-full flex bg-slate-900/90 text-slate-200 overflow-hidden backdrop-blur-3xl">
@@ -61,7 +76,7 @@ export default function SettingsApp() {
                   </div>
                   <div className="space-y-1">
                     <div className="text-white/40">已安装内存 (RAM)</div>
-                    <div className="text-white/90">2.00 GB LPDDR3</div>
+                    <div className="text-white/90">{status ? (status.memory.total / (1024 ** 3)).toFixed(2) : '2.00'} GB LPDDR3</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-white/40">系统架构</div>
@@ -98,7 +113,6 @@ export default function SettingsApp() {
           </div>
         )}
 
-        {/* Placeholder for other tabs */}
         {activeTab === 'network' && (
           <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-2xl font-semibold text-white mb-6">网络设置</h2>
@@ -119,19 +133,19 @@ export default function SettingsApp() {
                 <div className="grid grid-cols-2 gap-4 mt-4 text-sm border-t border-white/10 pt-4">
                   <div>
                     <div className="text-white/40 mb-1">IP 地址</div>
-                    <div className="text-white/90">192.168.1.100</div>
+                    <div className="text-white/90">{status?.network?.ip_address || '192.168.1.100'}</div>
                   </div>
                   <div>
                     <div className="text-white/40 mb-1">MAC 地址</div>
-                    <div className="text-white/90 font-mono">00:1A:2B:3C:4D:5E</div>
+                    <div className="text-white/90 font-mono">{status?.network?.mac_address || '00:1A:2B:3C:4D:5E'}</div>
                   </div>
                   <div>
-                    <div className="text-white/40 mb-1">子网掩码</div>
-                    <div className="text-white/90">255.255.255.0</div>
+                    <div className="text-white/40 mb-1">实时下载速率</div>
+                    <div className="text-white/90">{status ? (status.network.download_speed / 1024).toFixed(1) : 0} KB/s</div>
                   </div>
                   <div>
-                    <div className="text-white/40 mb-1">默认网关</div>
-                    <div className="text-white/90">192.168.1.1</div>
+                    <div className="text-white/40 mb-1">实时上传速率</div>
+                    <div className="text-white/90">{status ? (status.network.upload_speed / 1024).toFixed(1) : 0} KB/s</div>
                   </div>
                 </div>
               </div>
@@ -147,24 +161,28 @@ export default function SettingsApp() {
                  <div className="flex items-center gap-3 mb-6">
                    <HardDrive className="w-6 h-6 text-blue-400" />
                    <div>
-                     <div className="text-lg font-medium text-white">eMMC 内部存储 (/dev/mmcblk0)</div>
+                     <div className="text-lg font-medium text-white">内部存储 (/)</div>
                      <div className="text-sm text-white/50">挂载点: /</div>
                    </div>
                  </div>
                  <div className="space-y-3">
                    <div className="flex justify-between text-sm">
-                     <span className="text-white/70">已用 12.5 GB</span>
-                     <span className="text-white/40">共 32.0 GB</span>
+                     <span className="text-white/70">已用 {status ? (status.disk.used / (1024 ** 3)).toFixed(1) : 12.5} GB</span>
+                     <span className="text-white/40">共 {status ? (status.disk.total / (1024 ** 3)).toFixed(1) : 32.0} GB</span>
                    </div>
                    <div className="h-4 w-full bg-black/30 rounded-full overflow-hidden flex border border-white/5">
-                     <div className="h-full bg-blue-500" style={{ width: '25%' }} title="系统"></div>
-                     <div className="h-full bg-purple-500" style={{ width: '10%' }} title="应用"></div>
-                     <div className="h-full bg-amber-500" style={{ width: '4%' }} title="媒体"></div>
+                     <div className="h-full bg-blue-500" style={{ width: `${status?.disk?.percent || 25}%` }} title="系统使用"></div>
                    </div>
-                   <div className="flex gap-6 mt-4 text-xs text-white/60 pt-2">
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>系统 8.0 GB</div>
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>应用 3.2 GB</div>
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>媒体 1.3 GB</div>
+                   
+                   <div className="grid grid-cols-2 gap-4 mt-6 text-sm border-t border-white/10 pt-4">
+                     <div>
+                       <div className="text-white/40 mb-1">实时读取速率 (IO)</div>
+                       <div className="text-white/90">{status ? (status.disk.io_read / 1024).toFixed(1) : 0} KB/s</div>
+                     </div>
+                     <div>
+                       <div className="text-white/40 mb-1">实时写入速率 (IO)</div>
+                       <div className="text-white/90">{status ? (status.disk.io_write / 1024).toFixed(1) : 0} KB/s</div>
+                     </div>
                    </div>
                  </div>
               </div>
