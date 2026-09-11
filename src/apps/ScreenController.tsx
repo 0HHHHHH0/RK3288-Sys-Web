@@ -45,14 +45,14 @@ export default function ScreenController() {
     
     let cmd = '';
     if (action === 'start-clock') {
-      cmd = 'pkill -f flutter-pi; systemctl restart weather-clock.service';
+      cmd = 'pkill -9 -f flutter-pi; systemctl restart weather-clock.service';
     } else if (action === 'start-music') {
-      cmd = 'systemctl stop weather-clock.service; nohup flutter-pi /root/flutter_assets/ > /dev/null 2>&1 &';
+      cmd = 'systemctl stop weather-clock.service; pkill -9 -f flutter-pi; nohup flutter-pi /root/flutter_assets/ > /dev/null 2>&1 &';
     } else if (action === 'stop-all') {
-      cmd = 'systemctl stop weather-clock.service; pkill -f flutter-pi';
+      cmd = 'systemctl stop weather-clock.service; pkill -9 -f flutter-pi';
     }
 
-    const res = await executeCommandApi(token, cmd);
+    const res = await executeCommandApi(token, `bash -c '${cmd}'`);
     setLogs(`> ${cmd}\n${res.output || (res.exit_code === 0 ? '操作成功执行' : '执行失败 (Exit Code: ' + res.exit_code + ')')}`);
     
     // 等待一秒后再次刷新状态，以确保服务已完全启动或退出
