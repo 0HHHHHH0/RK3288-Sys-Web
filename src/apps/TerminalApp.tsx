@@ -57,6 +57,7 @@ export default function TerminalApp() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPointerDown={(e) => e.stopPropagation()}
             disabled={isExecuting}
             className={`flex-1 bg-transparent outline-none text-white border-none focus:ring-0 p-0 m-0 ${isExecuting ? 'opacity-50 cursor-not-allowed' : ''}`}
             autoFocus

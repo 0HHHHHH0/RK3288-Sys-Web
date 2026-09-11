@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Monitor, Wifi, Cpu, HardDrive, Shield, Info, Palette } from 'lucide-react';
-import { getSystemStatusApi } from '../api';
+import { getSystemStatusApi, getSystemInfoApi } from '../api';
 
 const MENU_ITEMS = [
   { id: 'system', icon: <Cpu className="w-5 h-5" />, label: '系统信息' },
@@ -14,17 +14,26 @@ const MENU_ITEMS = [
 export default function SettingsApp() {
   const [activeTab, setActiveTab] = useState('system');
   const [status, setStatus] = useState<any>(null);
+  const [systemInfo, setSystemInfo] = useState<any>(null);
 
   useEffect(() => {
-    const fetchStatus = async () => {
+    const fetchData = async () => {
+      const token = localStorage.getItem('feiniu_token') || '';
+      const [statusData, infoData] = await Promise.all([
+        getSystemStatusApi(token),
+        getSystemInfoApi(token)
+      ]);
+      setStatus(statusData);
+      setSystemInfo(infoData);
+    };
+    fetchData();
+    
+    // Only fetch occasionally for settings since it's mostly static info
+    const interval = setInterval(async () => {
       const token = localStorage.getItem('feiniu_token') || '';
       const data = await getSystemStatusApi(token);
       setStatus(data);
-    };
-    fetchStatus();
-    
-    // Only fetch occasionally for settings since it's mostly static info
-    const interval = setInterval(fetchStatus, 5000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -209,8 +218,8 @@ export default function SettingsApp() {
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                  <h3 className="text-lg font-medium text-white mb-4">修改管理员密码</h3>
                  <div className="space-y-3">
-                   <input type="password" placeholder="当前密码" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
-                   <input type="password" placeholder="新密码" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
+                   <input onPointerDown={(e) => e.stopPropagation()} type="password" placeholder="当前密码" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
+                   <input onPointerDown={(e) => e.stopPropagation()} type="password" placeholder="新密码" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
                    <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2.5 rounded-xl transition-colors mt-2">
                      确认修改
                    </button>
@@ -236,19 +245,23 @@ export default function SettingsApp() {
               <div className="mt-10 grid grid-cols-2 gap-x-12 gap-y-4 text-sm w-full max-w-sm z-10">
                 <div className="flex justify-between border-b border-white/10 pb-2">
                   <span className="text-white/40">系统版本</span>
-                  <span className="text-white">v2.4.0 (Stable)</span>
+                  <span className="text-white">{systemInfo?.os_version || 'Loading...'}</span>
                 </div>
                 <div className="flex justify-between border-b border-white/10 pb-2">
                   <span className="text-white/40">内核版本</span>
-                  <span className="text-white">Linux 4.4.194-rk3288</span>
+                  <span className="text-white">{systemInfo?.kernel_version || 'Loading...'}</span>
+                </div>
+                <div className="flex justify-between border-b border-white/10 pb-2">
+                  <span className="text-white/40">系统架构</span>
+                  <span className="text-white">{systemInfo?.architecture || 'Loading...'}</span>
                 </div>
                 <div className="flex justify-between border-b border-white/10 pb-2">
                   <span className="text-white/40">构建时间</span>
-                  <span className="text-white">2026-09-01</span>
+                  <span className="text-white">{systemInfo?.build_date || 'Loading...'}</span>
                 </div>
-                <div className="flex justify-between border-b border-white/10 pb-2">
+                <div className="flex justify-between border-b border-white/10 pb-2 col-span-2">
                   <span className="text-white/40">设备型号</span>
-                  <span className="text-white">Rockchip RK3288</span>
+                  <span className="text-white">{systemInfo?.device_model || 'Loading...'}</span>
                 </div>
               </div>
 

@@ -66,6 +66,14 @@ export default function DockerManager() {
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
           </div>
+        ) : (containers as any).error ? (
+          <div className="absolute inset-0 flex items-center justify-center text-rose-500">
+            {(containers as any).error}
+          </div>
+        ) : containers.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center text-white/40">
+            没有运行中的 Docker 容器
+          </div>
         ) : (
           containers.map(container => (
             <div key={container.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between hover:bg-white/10 transition-colors group">

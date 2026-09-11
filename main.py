@@ -178,7 +178,7 @@ def execute_command(req: CommandRequest):
 
 @app.get("/api/docker/containers", dependencies=[Depends(verify_token)])
 def get_docker_containers():
-    # Attempt to fetch real docker containers if docker is installed, otherwise fallback to mock
+    # Attempt to fetch real docker containers if docker is installed
     try:
         result = subprocess.run("docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Ports}}'", shell=True, capture_output=True, text=True, timeout=5)
         if result.returncode == 0 and result.stdout.strip():
@@ -196,17 +196,21 @@ def get_docker_containers():
                         "mem": "0MB"
                     })
             return {"containers": containers}
-    except:
-        pass
-    
-    # Fallback mock containers
+        return {"containers": []}
+    except Exception as e:
+        return {"containers": [], "error": str(e)}
+
+import platform
+
+@app.get("/api/system/info", dependencies=[Depends(verify_token)])
+def get_system_info():
     return {
-        "containers": [
-            { "id": "a1b2c3d4", "name": "nginx-proxy", "image": "nginx:latest", "state": "running", "ports": "80:80, 443:443", "cpu": "0.5%", "mem": "45MB" },
-            { "id": "e5f6g7h8", "name": "redis-cache", "image": "redis:alpine", "state": "running", "ports": "6379:6379", "cpu": "1.2%", "mem": "120MB" },
-            { "id": "i9j0k1l2", "name": "homeassistant", "image": "homeassistant/home-assistant", "state": "running", "ports": "8123:8123", "cpu": "5.4%", "mem": "450MB" },
-            { "id": "m3n4o5p6", "name": "jellyfin", "image": "jellyfin/jellyfin", "state": "exited", "ports": "8096:8096", "cpu": "0%", "mem": "0MB" },
-        ]
+        "os_name": "FeiNiu OS",
+        "os_version": "v2.4.0 (Stable)",
+        "kernel_version": platform.release(),
+        "architecture": platform.machine(),
+        "build_date": "2026-09-01",
+        "device_model": "Rockchip RK3288 (Generic)"
     }
 
 if __name__ == "__main__":

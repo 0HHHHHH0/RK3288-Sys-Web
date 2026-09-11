@@ -54,7 +54,7 @@ export default function Dashboard() {
   if (!status) {
     return (
       <aside className="absolute right-4 top-14 bottom-4 w-16 backdrop-blur-3xl bg-slate-900/40 border border-white/10 rounded-3xl flex items-center justify-center z-40">
-        <Activity className="w-5 h-5 animate-pulse text-white/50" />
+        <Activity className="w-5 h-5 animate-pulse text-rose-500" title="Backend disconnected" />
       </aside>
     );
   }

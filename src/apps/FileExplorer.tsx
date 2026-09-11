@@ -75,6 +75,10 @@ export default function FileExplorer() {
             <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
             </div>
+          ) : (items as any).error ? (
+            <div className="absolute inset-0 flex items-center justify-center text-rose-500">
+              {(items as any).error}
+            </div>
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
               {items.map((item, idx) => (
