@@ -3,6 +3,12 @@ import os
 import subprocess
 import psutil
 import jwt
+import crypt
+try:
+    import spwd
+except ImportError:
+    spwd = None
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,13 +46,29 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+def verify_linux_password(username, password):
+    if not spwd:
+        return False
+    try:
+        shadow_info = spwd.getspnam(username)
+        stored_hash = shadow_info.sp_pwdp
+        # If the user has no password or it's locked
+        if stored_hash in ('!', '*', '!!'):
+            return False
+        return crypt.crypt(password, stored_hash) == stored_hash
+    except KeyError:
+        return False
+    except PermissionError:
+        return False
+
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
-    # Mock authentication
-    if req.username == "admin" and req.password == "admin":
+    # Verify against actual Linux system users
+    if verify_linux_password(req.username, req.password):
         token = jwt.encode({"sub": req.username, "exp": time.time() + 3600*24}, SECRET_KEY, algorithm=ALGORITHM)
         return {"token": token}
-    raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    raise HTTPException(status_code=401, detail="用户名或密码错误，或者 API 未以 root 权限运行")
 
 
 # Global state to calculate network and IO speeds

@@ -8,8 +8,8 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin }: LoginProps) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
+  const [username, setUsername] = useState('root');
+  const [password, setPassword] = useState('root');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 

@@ -14,10 +14,18 @@ export default function ScreenController() {
       const token = localStorage.getItem('feiniu_token') || '';
       
       const clockRes = await executeCommandApi(token, 'systemctl is-active weather-clock.service');
-      setClockStatus(clockRes.output?.trim() === 'active' ? 'running' : 'stopped');
+      if (clockRes.exit_code === -1) {
+        setClockStatus('unknown');
+      } else {
+        setClockStatus(clockRes.output?.trim() === 'active' ? 'running' : 'stopped');
+      }
 
       const musicRes = await executeCommandApi(token, 'pgrep -f "flutter-pi"');
-      setMusicStatus(musicRes.output?.trim() ? 'running' : 'stopped');
+      if (musicRes.exit_code === -1) {
+        setMusicStatus('unknown');
+      } else {
+        setMusicStatus(musicRes.exit_code === 0 && musicRes.output?.trim() ? 'running' : 'stopped');
+      }
     } catch (e) {
       setClockStatus('unknown');
       setMusicStatus('unknown');

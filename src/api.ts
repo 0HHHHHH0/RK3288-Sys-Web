@@ -15,7 +15,7 @@ export async function loginApi(username: string, password: string) {
     // If we are in the AI Studio preview (run.app), the fetch will fail due to Mixed Content / network isolation.
     // Allow a bypass so the user can see the UI (which will then show 'Backend disconnected' in the apps).
     if (HOST.includes('run.app') || HOST === 'localhost') {
-      if (username === 'admin' && password === 'admin') {
+      if (username === 'root' && (password === 'root' || password === 'admin')) {
         console.warn('Backend fetch failed. Using preview mode bypass token.');
         return { token: 'preview_mode_token' };
       }

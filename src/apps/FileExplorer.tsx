@@ -1,23 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Folder, FileText, Image as ImageIcon, Video, File, ChevronRight, HardDrive, Home, Download, Loader2, LayoutGrid, List as ListIcon } from 'lucide-react';
+import { Folder, FileText, Image as ImageIcon, Video, File, ChevronRight, HardDrive, Home, Download, Loader2, LayoutGrid, List as ListIcon, FolderPlus, FilePlus, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { listDirectoryApi } from '../api';
+import { listDirectoryApi, executeCommandApi } from '../api';
 
 export default function FileExplorer() {
-  const [currentPath, setCurrentPath] = useState('/home/admin');
+  const [currentPath, setCurrentPath] = useState('/root');
   const [items, setItems] = useState<string[]>([]);
-  const [history, setHistory] = useState<string[]>(['/home/admin']);
+  const [history, setHistory] = useState<string[]>(['/root']);
   const [isLoading, setIsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
+  const fetchDir = async () => {
+    setIsLoading(true);
+    const token = localStorage.getItem('feiniu_token') || '';
+    const data = await listDirectoryApi(token, currentPath);
+    setItems(data.items);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    const fetchDir = async () => {
-      setIsLoading(true);
-      const token = localStorage.getItem('feiniu_token') || '';
-      const data = await listDirectoryApi(token, currentPath);
-      setItems(data.items);
-      setIsLoading(false);
-    };
     fetchDir();
   }, [currentPath]);
 
@@ -33,6 +34,34 @@ export default function FileExplorer() {
     navigateTo('/' + parts.join('/'));
   };
 
+  const handleCreateFolder = async () => {
+    const name = prompt('请输入新文件夹名称:');
+    if (!name) return;
+    const token = localStorage.getItem('feiniu_token') || '';
+    const targetPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+    await executeCommandApi(token, `mkdir -p "${targetPath}"`);
+    fetchDir();
+  };
+
+  const handleCreateFile = async () => {
+    const name = prompt('请输入新文件名称:');
+    if (!name) return;
+    const token = localStorage.getItem('feiniu_token') || '';
+    const targetPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+    await executeCommandApi(token, `touch "${targetPath}"`);
+    fetchDir();
+  };
+
+  const handleDelete = async (e: React.MouseEvent, item: string) => {
+    e.stopPropagation();
+    if (!confirm(`确定要删除 "${item}" 吗？此操作不可恢复。`)) return;
+    
+    const token = localStorage.getItem('feiniu_token') || '';
+    const targetPath = currentPath === '/' ? `/${item}` : `${currentPath}/${item}`;
+    await executeCommandApi(token, `rm -rf "${targetPath}"`);
+    fetchDir();
+  };
+
   const getIcon = (name: string) => {
     if (!name.includes('.')) return <Folder className="w-12 h-12 text-blue-400 fill-blue-400/20" />;
     if (name.endsWith('.jpg') || name.endsWith('.png')) return <ImageIcon className="w-12 h-12 text-emerald-400" />;
@@ -46,11 +75,8 @@ export default function FileExplorer() {
       {/* Sidebar */}
       <div className="w-48 border-r border-white/10 bg-black/20 p-4 flex flex-col gap-2">
         <div className="text-xs font-semibold text-white/40 mb-2 uppercase tracking-wider">快捷访问</div>
-        <button onClick={() => navigateTo('/home/admin')} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${currentPath.startsWith('/home/admin') ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'}`}>
-          <Home className="w-4 h-4" /> 主目录
-        </button>
-        <button onClick={() => navigateTo('/home/admin/Downloads')} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${currentPath === '/home/admin/Downloads' ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'}`}>
-          <Download className="w-4 h-4" /> 下载
+        <button onClick={() => navigateTo('/root')} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${currentPath.startsWith('/root') ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'}`}>
+          <Home className="w-4 h-4" /> root 目录
         </button>
         <div className="text-xs font-semibold text-white/40 mt-4 mb-2 uppercase tracking-wider">设备</div>
         <button onClick={() => navigateTo('/')} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${currentPath === '/' ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'}`}>
@@ -68,6 +94,18 @@ export default function FileExplorer() {
           <div className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 flex items-center">
             {currentPath}
           </div>
+          
+          <div className="flex items-center gap-2 mr-2">
+            <button onClick={handleCreateFolder} className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="新建文件夹">
+              <FolderPlus className="w-4 h-4" />
+            </button>
+            <button onClick={handleCreateFile} className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="新建文件">
+              <FilePlus className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="w-px h-6 bg-white/10"></div>
+
           <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-white/10">
             <button 
               onClick={() => setViewMode('grid')} 
@@ -104,8 +142,14 @@ export default function FileExplorer() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.02 }}
                     onDoubleClick={() => !item.includes('.') && navigateTo(currentPath === '/' ? `/${item}` : `${currentPath}/${item}`)}
-                    className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-white/10 cursor-pointer group"
+                    className="relative flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-white/10 cursor-pointer group"
                   >
+                    <button 
+                      onClick={(e) => handleDelete(e, item)}
+                      className="absolute top-1 right-1 p-1.5 bg-rose-500/80 hover:bg-rose-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                     <div className="group-active:scale-95 transition-transform">
                       {getIcon(item)}
                     </div>
@@ -126,6 +170,7 @@ export default function FileExplorer() {
                   <div className="w-8"></div>
                   <div className="flex-1">名称</div>
                   <div className="w-24 text-right">类型</div>
+                  <div className="w-12"></div>
                 </div>
                 {items.map((item, idx) => (
                   <motion.div
@@ -144,6 +189,14 @@ export default function FileExplorer() {
                     </div>
                     <div className="w-24 text-right text-xs text-white/40">
                       {item.includes('.') ? item.split('.').pop()?.toUpperCase() + ' 文件' : '文件夹'}
+                    </div>
+                    <div className="w-12 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => handleDelete(e, item)}
+                        className="p-1.5 text-rose-400 hover:bg-rose-500/20 rounded-md"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </motion.div>
                 ))}

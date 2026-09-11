@@ -1,6 +1,19 @@
-import { useState, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { executeCommandApi } from '../api';
+
+// Extract the history list to a memoized component so it doesn't re-render on every keystroke
+const HistoryView = memo(({ history }: { history: { type: string, text: string }[] }) => {
+  return (
+    <>
+      {history.map((line, i) => (
+        <div key={i} className={`whitespace-pre-wrap ${line.type === 'error' ? 'text-red-400' : line.type === 'input' ? 'text-white' : 'text-emerald-400'}`}>
+          {line.type === 'input' ? <span className="text-emerald-500 mr-2">root@rk3288:~#</span> : null}
+          {line.text}
+        </div>
+      ))}
+    </>
+  );
+});
 
 export default function TerminalApp() {
   const [history, setHistory] = useState<{ type: 'input' | 'output' | 'error'; text: string }[]>([
@@ -12,17 +25,18 @@ export default function TerminalApp() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // behavior: 'auto' prevents the lag associated with 'smooth' when rendering large lists rapidly
+    bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
   }, [history]);
 
   const handleCommand = async (cmd: string) => {
     const trimmedCmd = cmd.trim();
     if (!trimmedCmd) {
-      setHistory(prev => [...prev, { type: 'input', text: '' }]);
+      setHistory(prev => [...prev.slice(-200), { type: 'input', text: '' }]);
       return;
     }
 
-    setHistory(prev => [...prev, { type: 'input', text: trimmedCmd }]);
+    setHistory(prev => [...prev.slice(-200), { type: 'input', text: trimmedCmd }]);
 
     if (trimmedCmd.toLowerCase() === 'clear') {
       setHistory([]);
@@ -33,7 +47,13 @@ export default function TerminalApp() {
     const token = localStorage.getItem('feiniu_token') || '';
     const res = await executeCommandApi(token, trimmedCmd);
     
-    setHistory(prev => [...prev, { type: res.exit_code === 0 ? 'output' : 'error', text: res.output || (res.exit_code === 0 ? '' : 'Command failed without output.') }]);
+    // Slice output to prevent massive DOM if command outputs thousands of lines
+    let finalOutput = res.output || (res.exit_code === 0 ? '' : 'Command failed without output.');
+    if (finalOutput.length > 50000) {
+      finalOutput = finalOutput.substring(finalOutput.length - 50000) + '\\n...[Output Truncated]';
+    }
+
+    setHistory(prev => [...prev.slice(-200), { type: res.exit_code === 0 ? 'output' : 'error', text: finalOutput }]);
     setIsExecuting(false);
   };
 
@@ -47,14 +67,10 @@ export default function TerminalApp() {
   return (
     <div className="w-full h-full bg-slate-950/90 text-emerald-400 font-mono p-4 overflow-y-auto flex flex-col text-sm shadow-inner relative">
       <div className="flex-1 space-y-1">
-        {history.map((line, i) => (
-          <div key={i} className={`whitespace-pre-wrap ${line.type === 'error' ? 'text-red-400' : line.type === 'input' ? 'text-white' : 'text-emerald-400'}`}>
-            {line.type === 'input' ? <span className="text-emerald-500 mr-2">admin@rk3288:~$</span> : null}
-            {line.text}
-          </div>
-        ))}
+        <HistoryView history={history} />
+        
         <div className="flex items-center text-white mt-2">
-          <span className="text-emerald-500 mr-2">admin@rk3288:~$</span>
+          <span className="text-emerald-500 mr-2">root@rk3288:~#</span>
           <input
             type="text"
             value={input}

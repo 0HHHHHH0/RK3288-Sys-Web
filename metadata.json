@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "RK3288 Control Panel",
+  "description": "FeiNiu OS RK3288 Web Control Panel",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
