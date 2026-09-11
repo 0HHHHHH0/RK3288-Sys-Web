@@ -20,7 +20,7 @@ export default function ScreenController() {
         setClockStatus(clockRes.output?.trim() === 'active' ? 'running' : 'stopped');
       }
 
-      const musicRes = await executeCommandApi(token, 'pgrep -f "[f]lutter-pi"');
+      const musicRes = await executeCommandApi(token, 'pgrep -x flutter-pi');
       if (musicRes.exit_code === -1) {
         setMusicStatus('unknown');
       } else {
@@ -44,12 +44,14 @@ export default function ScreenController() {
     const token = localStorage.getItem('feiniu_token') || '';
     
     let cmd = '';
+    const killCmd = 'killall -9 flutter-pi 2>/dev/null || pkill -9 -x flutter-pi 2>/dev/null || true';
+    
     if (action === 'start-clock') {
-      cmd = 'pkill -9 -f "[f]lutter-pi" || true; systemctl restart weather-clock.service';
+      cmd = `${killCmd}; systemctl restart weather-clock.service`;
     } else if (action === 'start-music') {
-      cmd = 'systemctl stop weather-clock.service; pkill -9 -f "[f]lutter-pi" || true; nohup flutter-pi /root/flutter_assets/ > /dev/null 2>&1 &';
+      cmd = `systemctl stop weather-clock.service; ${killCmd}; nohup flutter-pi /root/flutter_assets/ > /dev/null 2>&1 &`;
     } else if (action === 'stop-all') {
-      cmd = 'systemctl stop weather-clock.service; pkill -9 -f "[f]lutter-pi" || true';
+      cmd = `systemctl stop weather-clock.service; ${killCmd}`;
     }
 
     const res = await executeCommandApi(token, cmd);
