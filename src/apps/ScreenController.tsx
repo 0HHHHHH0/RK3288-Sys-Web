@@ -53,7 +53,9 @@ export default function ScreenController() {
     }
 
     const res = await executeCommandApi(token, `bash -c '${cmd}'`);
-    setLogs(`> ${cmd}\n${res.output || (res.exit_code === 0 ? '操作成功执行' : '执行失败 (Exit Code: ' + res.exit_code + ')')}`);
+    // pkill returns 1 if no processes matched. This is expected if the app wasn't running, so we shouldn't treat it as a failure for our UI.
+    const success = res.exit_code === 0 || (res.exit_code === 1 && cmd.includes('pkill'));
+    setLogs(`> ${cmd}\n${res.output || (success ? '操作成功执行' : '执行失败 (Exit Code: ' + res.exit_code + ')')}`);
     
     // 等待一秒后再次刷新状态，以确保服务已完全启动或退出
     setTimeout(checkStatus, 1000);
