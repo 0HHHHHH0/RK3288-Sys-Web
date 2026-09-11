@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Power, Settings, Bell, FolderOpen, Terminal, Music, Clock, Database, X, Maximize2, Minus, LogOut, RefreshCw } from 'lucide-react';
+import { Power, Settings, Bell, FolderOpen, Terminal, Monitor, Database, X, Maximize2, Minus, LogOut, RefreshCw, AlertCircle, Info } from 'lucide-react';
 import Dashboard from './Dashboard';
-import { rebootSystemApi } from './api';
+import { rebootSystemApi, executeCommandApi } from './api';
 
 // Import apps
 import TerminalApp from './apps/TerminalApp';
 import FileExplorer from './apps/FileExplorer';
 import DockerManager from './apps/DockerManager';
-import MusicPlayer from './apps/MusicPlayer';
 import SettingsApp from './apps/SettingsApp';
-import ClockApp from './apps/ClockApp';
+import ScreenController from './apps/ScreenController';
 
 interface DesktopProps {
   onLogout: () => void;
@@ -22,13 +21,22 @@ interface AppWindow {
   icon: React.ReactNode;
   component: React.ReactNode;
   isMaximized?: boolean;
+  width?: number;
+  height?: number;
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'error';
+  time: Date;
 }
 
 const APPS = [
   { id: 'files', title: '文件管理', icon: <FolderOpen className="w-6 h-6 text-blue-400" />, component: <FileExplorer /> },
   { id: 'terminal', title: '终端控制', icon: <Terminal className="w-6 h-6 text-emerald-400" />, component: <TerminalApp /> },
-  { id: 'music', title: '音乐播放', icon: <Music className="w-6 h-6 text-pink-400" />, component: <MusicPlayer /> },
-  { id: 'clock', title: '时钟切换', icon: <Clock className="w-6 h-6 text-amber-400" />, component: <ClockApp /> },
+  { id: 'screen', title: '外屏控制', icon: <Monitor className="w-6 h-6 text-amber-400" />, component: <ScreenController /> },
   { id: 'docker', title: 'Docker 控制', icon: <Database className="w-6 h-6 text-cyan-400" />, component: <DockerManager /> },
 ];
 
@@ -38,12 +46,120 @@ export default function Desktop({ onLogout }: DesktopProps) {
   
   // New States for System UI Overlays
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [showPowerMenu, setShowPowerMenu] = useState(false);
   const [isRebooting, setIsRebooting] = useState(false);
 
+  // Fetch real notifications periodically
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const fetchNotifications = async () => {
+      try {
+        const token = localStorage.getItem('feiniu_token') || '';
+        if (!token) return;
+
+        const newNotifs: Notification[] = [];
+        
+        // 1. Check CPU Temperature
+        try {
+          const tempRes = await executeCommandApi(token, 'cat /sys/class/thermal/thermal_zone0/temp');
+          if (tempRes.output) {
+            const temp = parseInt(tempRes.output.trim()) / 1000;
+            if (temp > 80) {
+              newNotifs.push({
+                id: 'temp_high',
+                title: '温度过高警告',
+                message: `当前 CPU 温度达到 ${temp.toFixed(1)}°C，请注意散热`,
+                type: 'warning',
+                time: new Date()
+              });
+            } else if (temp > 0 && notifications.length === 0) {
+              // Just an info on first load if it's fine
+              newNotifs.push({
+                id: 'temp_ok',
+                title: '系统状态良好',
+                message: `当前 CPU 温度 ${temp.toFixed(1)}°C，运行平稳`,
+                type: 'info',
+                time: new Date()
+              });
+            }
+          }
+        } catch (e) {
+          // Ignore temp errors (maybe not supported)
+        }
+
+        // 2. Check Disk Space
+        try {
+          const diskRes = await executeCommandApi(token, 'df -h / | awk \'NR==2 {print $5}\'');
+          if (diskRes.output) {
+            const usage = parseInt(diskRes.output.trim().replace('%', ''));
+            if (usage > 90) {
+              newNotifs.push({
+                id: 'disk_full',
+                title: '存储空间不足',
+                message: `根目录已使用 ${usage}%，请及时清理空间`,
+                type: 'warning',
+                time: new Date()
+              });
+            }
+          }
+        } catch (e) {
+          // Ignore disk errors
+        }
+        
+        // 3. Check failed services
+        try {
+          const failRes = await executeCommandApi(token, 'systemctl --failed --no-legend | wc -l');
+          if (failRes.output) {
+            const failedCount = parseInt(failRes.output.trim());
+            if (failedCount > 0) {
+              newNotifs.push({
+                id: 'service_failed',
+                title: '服务运行异常',
+                message: `检测到 ${failedCount} 个服务启动失败，请检查 systemctl`,
+                type: 'error',
+                time: new Date()
+              });
+            }
+          }
+        } catch (e) {
+          // Ignore systemctl errors
+        }
+
+        if (newNotifs.length > 0) {
+          setNotifications(prev => {
+            const merged = [...prev];
+            let added = false;
+            newNotifs.forEach(n => {
+              // Replace if same ID exists to update time/message, or add if new
+              const existingIdx = merged.findIndex(x => x.id === n.id);
+              if (existingIdx >= 0) {
+                // If it's the exact same warning, we can just update it
+                merged[existingIdx] = n;
+              } else {
+                merged.unshift(n);
+                added = true;
+              }
+            });
+            if (added) {
+              setUnreadCount(c => c + 1);
+            }
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch notifications', err);
+      }
+    };
+
+    fetchNotifications();
+    const notifTimer = setInterval(fetchNotifications, 30000); // Check every 30s
+    const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    return () => {
+      clearInterval(notifTimer);
+      clearInterval(clockTimer);
+    };
   }, []);
 
   const openApp = (app: Omit<AppWindow, 'isMaximized'>) => {
@@ -79,6 +195,31 @@ export default function Desktop({ onLogout }: DesktopProps) {
       if (!win) return prev;
       return [...prev.filter(w => w.id !== id), win];
     });
+  };
+
+  const startResize = (e: React.PointerEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const win = activeWindows.find(w => w.id === id);
+    if (!win) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = win.width || 750;
+    const startHeight = win.height || 480;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const newWidth = Math.max(300, startWidth + (moveEvent.clientX - startX));
+      const newHeight = Math.max(200, startHeight + (moveEvent.clientY - startY));
+      setActiveWindows(prev => prev.map(w => w.id === id ? { ...w, width: newWidth, height: newHeight } : w));
+    };
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   };
 
   const handleReboot = async () => {
@@ -166,25 +307,47 @@ export default function Desktop({ onLogout }: DesktopProps) {
                   <button onClick={() => setShowNotifications(false)} className="text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="p-4 flex flex-col gap-3 max-h-[300px] overflow-y-auto">
-                  <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                    <div className="text-sm font-medium text-emerald-400 mb-1">系统启动成功</div>
-                    <div className="text-xs text-white/60">所有核心服务已就绪。CPU 温度正常。</div>
-                  </div>
-                  <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                    <div className="text-sm font-medium text-blue-400 mb-1">Docker 引擎</div>
-                    <div className="text-xs text-white/60">检测到 4 个容器配置，其中 3 个正在运行中。</div>
-                  </div>
+                  {notifications.length > 0 ? notifications.map(notif => (
+                    <div key={notif.id} className="bg-white/5 p-3 rounded-xl border border-white/5 flex gap-3">
+                      <div className="mt-0.5">
+                        {notif.type === 'error' ? <AlertCircle className="w-4 h-4 text-rose-400" /> :
+                         notif.type === 'warning' ? <AlertCircle className="w-4 h-4 text-amber-400" /> :
+                         <Info className="w-4 h-4 text-blue-400" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-sm font-medium ${
+                            notif.type === 'error' ? 'text-rose-400' :
+                            notif.type === 'warning' ? 'text-amber-400' : 'text-blue-400'
+                          }`}>{notif.title}</span>
+                          <span className="text-[10px] text-white/30">
+                            {notif.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div className="text-xs text-white/60">{notif.message}</div>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="text-center text-white/40 text-sm py-4">
+                      暂无新通知
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
           <button 
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={() => {
+              setShowNotifications(!showNotifications);
+              if (!showNotifications) setUnreadCount(0); // clear unread on open
+            }}
             className={`p-2.5 rounded-xl transition-colors relative ${showNotifications ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/70 hover:text-white'}`}
           >
             <Bell className="w-5 h-5" />
-            <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-black/50"></span>
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border border-black/50"></span>
+            )}
           </button>
           <button 
             onClick={openSettings}
@@ -230,8 +393,8 @@ export default function Desktop({ onLogout }: DesktopProps) {
                     opacity: 1, 
                     scale: 1, 
                     y: 0,
-                    width: win.isMaximized ? '100%' : 750,
-                    height: win.isMaximized ? '100%' : 480,
+                    width: win.isMaximized ? '100%' : (win.width || 750),
+                    height: win.isMaximized ? '100%' : (win.height || 480),
                     top: win.isMaximized ? 0 : 50 + (activeWindows.indexOf(win) * 30),
                     left: win.isMaximized ? 0 : 100 + (activeWindows.indexOf(win) * 30),
                   }}
@@ -271,6 +434,13 @@ export default function Desktop({ onLogout }: DesktopProps) {
                   <div className="flex-1 relative overflow-hidden">
                     {win.component}
                   </div>
+                  {/* Resize Handle */}
+                  {!win.isMaximized && (
+                    <div 
+                      className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50"
+                      onPointerDown={(e) => startResize(e, win.id)}
+                    />
+                  )}
                 </motion.div>
               );
             })}

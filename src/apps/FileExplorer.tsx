@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Folder, FileText, Image as ImageIcon, Video, File, ChevronRight, HardDrive, Home, Download, Loader2 } from 'lucide-react';
+import { Folder, FileText, Image as ImageIcon, Video, File, ChevronRight, HardDrive, Home, Download, Loader2, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { listDirectoryApi } from '../api';
 
@@ -8,6 +8,7 @@ export default function FileExplorer() {
   const [items, setItems] = useState<string[]>([]);
   const [history, setHistory] = useState<string[]>(['/home/admin']);
   const [isLoading, setIsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   useEffect(() => {
     const fetchDir = async () => {
@@ -67,6 +68,20 @@ export default function FileExplorer() {
           <div className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 flex items-center">
             {currentPath}
           </div>
+          <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-white/10">
+            <button 
+              onClick={() => setViewMode('grid')} 
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'}`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setViewMode('list')} 
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'}`}
+            >
+              <ListIcon className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* File Grid */}
@@ -80,30 +95,65 @@ export default function FileExplorer() {
               {(items as any).error}
             </div>
           ) : (
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
-              {items.map((item, idx) => (
-                <motion.div
-                  key={item}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.02 }}
-                  onDoubleClick={() => !item.includes('.') && navigateTo(currentPath === '/' ? `/${item}` : `${currentPath}/${item}`)}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-white/10 cursor-pointer group"
-                >
-                  <div className="group-active:scale-95 transition-transform">
-                    {getIcon(item)}
+            viewMode === 'grid' ? (
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                {items.map((item, idx) => (
+                  <motion.div
+                    key={item}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.02 }}
+                    onDoubleClick={() => !item.includes('.') && navigateTo(currentPath === '/' ? `/${item}` : `${currentPath}/${item}`)}
+                    className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-white/10 cursor-pointer group"
+                  >
+                    <div className="group-active:scale-95 transition-transform">
+                      {getIcon(item)}
+                    </div>
+                    <span className="text-xs text-center w-full truncate text-white/80 group-hover:text-white">
+                      {item}
+                    </span>
+                  </motion.div>
+                ))}
+                {items.length === 0 && (
+                  <div className="col-span-full text-center text-white/40 mt-10">
+                    文件夹为空
                   </div>
-                  <span className="text-xs text-center w-full truncate text-white/80 group-hover:text-white">
-                    {item}
-                  </span>
-                </motion.div>
-              ))}
-              {items.length === 0 && (
-                <div className="col-span-full text-center text-white/40 mt-10">
-                  文件夹为空
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <div className="flex items-center gap-4 px-4 py-2 border-b border-white/10 text-xs font-medium text-white/50 mb-2">
+                  <div className="w-8"></div>
+                  <div className="flex-1">名称</div>
+                  <div className="w-24 text-right">类型</div>
                 </div>
-              )}
-            </div>
+                {items.map((item, idx) => (
+                  <motion.div
+                    key={item}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.01 }}
+                    onDoubleClick={() => !item.includes('.') && navigateTo(currentPath === '/' ? `/${item}` : `${currentPath}/${item}`)}
+                    className="flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-white/10 cursor-pointer group"
+                  >
+                    <div className="w-8 flex items-center justify-center scale-75">
+                      {getIcon(item)}
+                    </div>
+                    <div className="flex-1 text-sm text-white/80 group-hover:text-white truncate">
+                      {item}
+                    </div>
+                    <div className="w-24 text-right text-xs text-white/40">
+                      {item.includes('.') ? item.split('.').pop()?.toUpperCase() + ' 文件' : '文件夹'}
+                    </div>
+                  </motion.div>
+                ))}
+                {items.length === 0 && (
+                  <div className="text-center text-white/40 mt-10 text-sm">
+                    文件夹为空
+                  </div>
+                )}
+              </div>
+            )
           )}
         </div>
       </div>

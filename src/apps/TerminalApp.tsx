@@ -17,7 +17,10 @@ export default function TerminalApp() {
 
   const handleCommand = async (cmd: string) => {
     const trimmedCmd = cmd.trim();
-    if (!trimmedCmd) return;
+    if (!trimmedCmd) {
+      setHistory(prev => [...prev, { type: 'input', text: '' }]);
+      return;
+    }
 
     setHistory(prev => [...prev, { type: 'input', text: trimmedCmd }]);
 
