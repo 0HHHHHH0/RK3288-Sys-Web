@@ -89,6 +89,38 @@ export async function rebootSystemApi(token: string) {
   return { status: 'success', message: 'Rebooting mock...' };
 }
 
+export async function executeCommandApi(token: string, command: string) {
+  try {
+    const res = await fetch(`http://localhost:6666/api/terminal/execute`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    // Fallback
+  }
+  return { output: `[Local Mock] Command executed: ${command}\nBackend not connected.`, exit_code: 0 };
+}
+
+export async function getDockerContainersApi(token: string) {
+  try {
+    const res = await fetch(`http://localhost:6666/api/docker/containers`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    // Fallback
+  }
+  
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return {
+    containers: [
+      { id: "a1b2c3d4", name: "nginx-proxy", image: "nginx:latest", state: "running", ports: "80:80, 443:443", cpu: "0.5%", mem: "45MB" },
+      { id: "e5f6g7h8", name: "redis-cache", image: "redis:alpine", state: "running", ports: "6379:6379", cpu: "1.2%", mem: "120MB" },
+    ]
+  };
+}
 export async function listDirectoryApi(token: string, path: string) {
   try {
     const res = await fetch(`http://localhost:6666/api/fs/list?path=${encodeURIComponent(path)}`, {

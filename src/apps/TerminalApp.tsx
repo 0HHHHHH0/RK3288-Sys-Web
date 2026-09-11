@@ -1,62 +1,41 @@
 import { useState, useRef, useEffect } from 'react';
 import { Terminal as TerminalIcon } from 'lucide-react';
+import { executeCommandApi } from '../api';
 
 export default function TerminalApp() {
   const [history, setHistory] = useState<{ type: 'input' | 'output' | 'error'; text: string }[]>([
     { type: 'output', text: 'FeiNiu OS (RK3288) Terminal v1.0.0' },
-    { type: 'output', text: 'Type "help" to see available commands.' }
+    { type: 'output', text: 'Type "help" to see available commands or try real bash commands.' }
   ]);
   const [input, setInput] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history]);
 
-  const handleCommand = (cmd: string) => {
+  const handleCommand = async (cmd: string) => {
     const trimmedCmd = cmd.trim();
     if (!trimmedCmd) return;
 
     setHistory(prev => [...prev, { type: 'input', text: trimmedCmd }]);
 
-    let output = '';
-    let isError = false;
-
-    const parts = trimmedCmd.split(' ');
-    const baseCmd = parts[0].toLowerCase();
-
-    switch (baseCmd) {
-      case 'help':
-        output = 'Available commands: help, clear, whoami, date, uname, echo, ls';
-        break;
-      case 'clear':
-        setHistory([]);
-        return;
-      case 'whoami':
-        output = 'admin';
-        break;
-      case 'date':
-        output = new Date().toString();
-        break;
-      case 'uname':
-        output = 'Linux rk3288 4.4.194 #1 SMP PREEMPT aarch64 GNU/Linux';
-        break;
-      case 'echo':
-        output = parts.slice(1).join(' ');
-        break;
-      case 'ls':
-        output = 'Desktop  Documents  Downloads  Music  Pictures  Public  Templates  Videos';
-        break;
-      default:
-        output = `Command not found: ${baseCmd}`;
-        isError = true;
+    if (trimmedCmd.toLowerCase() === 'clear') {
+      setHistory([]);
+      return;
     }
 
-    setHistory(prev => [...prev, { type: isError ? 'error' : 'output', text: output }]);
+    setIsExecuting(true);
+    const token = localStorage.getItem('feiniu_token') || '';
+    const res = await executeCommandApi(token, trimmedCmd);
+    
+    setHistory(prev => [...prev, { type: res.exit_code === 0 ? 'output' : 'error', text: res.output || (res.exit_code === 0 ? '' : 'Command failed without output.') }]);
+    setIsExecuting(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isExecuting) {
       handleCommand(input);
       setInput('');
     }
@@ -78,7 +57,8 @@ export default function TerminalApp() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent outline-none text-white border-none focus:ring-0 p-0 m-0"
+            disabled={isExecuting}
+            className={`flex-1 bg-transparent outline-none text-white border-none focus:ring-0 p-0 m-0 ${isExecuting ? 'opacity-50 cursor-not-allowed' : ''}`}
             autoFocus
             spellCheck={false}
           />

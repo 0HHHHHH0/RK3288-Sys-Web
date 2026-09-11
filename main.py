@@ -1,5 +1,6 @@
 import time
 import os
+import subprocess
 import psutil
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -27,6 +28,9 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class CommandRequest(BaseModel):
+    command: str
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
@@ -43,6 +47,7 @@ def login(req: LoginRequest):
         token = jwt.encode({"sub": req.username, "exp": time.time() + 3600*24}, SECRET_KEY, algorithm=ALGORITHM)
         return {"token": token}
     raise HTTPException(status_code=401, detail="Invalid username or password")
+
 
 @app.get("/api/system/status", dependencies=[Depends(verify_token)])
 def get_system_status() -> Dict[str, Any]:
@@ -101,6 +106,59 @@ def reboot_system():
     # Mock reboot command
     # os.system("reboot")
     return {"status": "success", "message": "System is rebooting..."}
+
+@app.post("/api/terminal/execute", dependencies=[Depends(verify_token)])
+def execute_command(req: CommandRequest):
+    try:
+        if not req.command.strip():
+            return {"output": "", "exit_code": 0}
+        result = subprocess.run(
+            req.command, 
+            shell=True, 
+            capture_output=True, 
+            text=True, 
+            timeout=10, 
+            cwd="/home"
+        )
+        output = result.stdout + result.stderr
+        return {"output": output, "exit_code": result.returncode}
+    except subprocess.TimeoutExpired:
+        return {"output": "Error: Command timed out after 10 seconds.", "exit_code": -1}
+    except Exception as e:
+        return {"output": f"Error executing command: {str(e)}", "exit_code": -1}
+
+@app.get("/api/docker/containers", dependencies=[Depends(verify_token)])
+def get_docker_containers():
+    # Attempt to fetch real docker containers if docker is installed, otherwise fallback to mock
+    try:
+        result = subprocess.run("docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Ports}}'", shell=True, capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and result.stdout.strip():
+            containers = []
+            for line in result.stdout.strip().split('\n'):
+                parts = line.split('|')
+                if len(parts) == 5:
+                    containers.append({
+                        "id": parts[0][:8],
+                        "name": parts[1],
+                        "image": parts[2],
+                        "state": parts[3],
+                        "ports": parts[4] or "None",
+                        "cpu": "0.0%",
+                        "mem": "0MB"
+                    })
+            return {"containers": containers}
+    except:
+        pass
+    
+    # Fallback mock containers
+    return {
+        "containers": [
+            { "id": "a1b2c3d4", "name": "nginx-proxy", "image": "nginx:latest", "state": "running", "ports": "80:80, 443:443", "cpu": "0.5%", "mem": "45MB" },
+            { "id": "e5f6g7h8", "name": "redis-cache", "image": "redis:alpine", "state": "running", "ports": "6379:6379", "cpu": "1.2%", "mem": "120MB" },
+            { "id": "i9j0k1l2", "name": "homeassistant", "image": "homeassistant/home-assistant", "state": "running", "ports": "8123:8123", "cpu": "5.4%", "mem": "450MB" },
+            { "id": "m3n4o5p6", "name": "jellyfin", "image": "jellyfin/jellyfin", "state": "exited", "ports": "8096:8096", "cpu": "0%", "mem": "0MB" },
+        ]
+    }
 
 if __name__ == "__main__":
     import uvicorn

@@ -172,10 +172,72 @@ export default function SettingsApp() {
           </div>
         )}
 
-        {['security', 'about'].includes(activeTab) && (
-          <div className="flex flex-col items-center justify-center h-full text-white/30 space-y-4 animate-in fade-in duration-500">
-            <Info className="w-12 h-12" />
-            <p>该模块配置正在开发中</p>
+        {activeTab === 'security' && (
+          <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-2xl font-semibold text-white mb-6">安全中心</h2>
+            <div className="space-y-4">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                 <h3 className="text-lg font-medium text-white mb-4">系统防火墙 (UFW)</h3>
+                 <div className="flex items-center justify-between">
+                   <div className="text-sm text-white/60">当前防火墙状态: <span className="text-emerald-400">已开启</span></div>
+                   <div className="w-12 h-6 bg-blue-500 rounded-full relative cursor-pointer">
+                    <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                   </div>
+                 </div>
+                 <div className="mt-4 pt-4 border-t border-white/10 text-xs text-white/40">
+                   允许 22 (SSH), 80 (HTTP), 443 (HTTPS), 6666 (API) 端口的入站连接。
+                 </div>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                 <h3 className="text-lg font-medium text-white mb-4">修改管理员密码</h3>
+                 <div className="space-y-3">
+                   <input type="password" placeholder="当前密码" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
+                   <input type="password" placeholder="新密码" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
+                   <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2.5 rounded-xl transition-colors mt-2">
+                     确认修改
+                   </button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'about' && (
+          <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-2xl font-semibold text-white mb-6">关于系统</h2>
+            <div className="flex flex-col items-center justify-center p-12 bg-white/5 border border-white/10 rounded-3xl relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 pointer-events-none"></div>
+              
+              <div className="w-24 h-24 bg-gradient-to-tr from-blue-600 to-indigo-400 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/20 mb-6 relative z-10">
+                <span className="text-4xl font-bold text-white tracking-tighter">FN</span>
+              </div>
+              
+              <h1 className="text-3xl font-bold text-white tracking-wide z-10">FeiNiu OS</h1>
+              <p className="text-white/60 mt-2 z-10">专业级嵌入式微型 NAS 系统</p>
+              
+              <div className="mt-10 grid grid-cols-2 gap-x-12 gap-y-4 text-sm w-full max-w-sm z-10">
+                <div className="flex justify-between border-b border-white/10 pb-2">
+                  <span className="text-white/40">系统版本</span>
+                  <span className="text-white">v2.4.0 (Stable)</span>
+                </div>
+                <div className="flex justify-between border-b border-white/10 pb-2">
+                  <span className="text-white/40">内核版本</span>
+                  <span className="text-white">Linux 4.4.194-rk3288</span>
+                </div>
+                <div className="flex justify-between border-b border-white/10 pb-2">
+                  <span className="text-white/40">构建时间</span>
+                  <span className="text-white">2026-09-01</span>
+                </div>
+                <div className="flex justify-between border-b border-white/10 pb-2">
+                  <span className="text-white/40">设备型号</span>
+                  <span className="text-white">Rockchip RK3288</span>
+                </div>
+              </div>
+
+              <button className="mt-10 bg-white text-slate-900 px-6 py-2.5 rounded-full font-semibold shadow-xl hover:scale-105 active:scale-95 transition-transform z-10">
+                检查系统更新
+              </button>
+            </div>
           </div>
         )}
       </div>
