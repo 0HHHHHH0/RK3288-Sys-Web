@@ -21,8 +21,8 @@ export default function Login({ onLogin }: LoginProps) {
     try {
       const response = await loginApi(username, password);
       onLogin(response.token);
-    } catch (err) {
-      setError('用户名或密码错误 (默认 admin/admin)');
+    } catch (err: any) {
+      setError(err.message || '登录失败');
     } finally {
       setIsLoading(false);
     }
